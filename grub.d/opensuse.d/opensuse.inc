@@ -28,7 +28,7 @@ if [ "${type}" = "install" ]; then
   }
 
   menuentry "openSUSE Rescue System" {
-    bootoptions="ramdisk_size=512000 ramdisk_blocksize=4096 initrd=initrd splash=silent $install_option quiet showopts rescue=1"
+    bootoptions="ramdisk_size=512000 ramdisk_blocksize=4096 initrd=initrd splash=silent quiet showopts rescue=1"
     linux $kernel_path_prefix/boot/$boot_dir/loader/linux $bootoptions
     initrd $kernel_path_prefix/boot/$boot_dir/loader/initrd
   }
