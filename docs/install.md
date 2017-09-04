@@ -7,7 +7,7 @@ layout: default
 
 # {{ page.title }}
 
-## Getting the files
+## Getting the configuration files
 
 ### Using Git
 
@@ -31,17 +31,16 @@ If Git is not installed, we can still get the files as long as we have a basic U
 wget https://github.com/aguslr/multibootusb/tarball/master -O - | tar -xzv --strip-components 1 --exclude={README.md,docs}
 ```
 
+## Creating new USB drive
 
-## Creating the USB drive
-
-### Manually prepare the drive
+### Manually preparing the drive
 
 #### Creating a bootable USB drive
 
 Follow the instructions to create a [Hybrid UEFI GPT + BIOS GPT/MBR boot][efi+bios] from the ArchWiki.
 
 
-#### Copying the files to the USB drive
+#### Copying the configuration files to the USB drive
 
 1. Set variables to avoid errors:
 
@@ -53,21 +52,21 @@ Follow the instructions to create a [Hybrid UEFI GPT + BIOS GPT/MBR boot][efi+bi
 
         mount --target $mntusb $partusb
 
-3. Create a directory named *boot* to store GRUB's configuration files, a directory named *bin* for binary files and another named *isos* for the kernel/ISO files:
+3. Create a directory named *boot* to store GRUB's configuration files and a directory named *isos* for the kernel/ISO files:
 
-        mkdir -p $mntusb/boot/{grub/grub.d/,bin,isos}
+        mkdir -p $mntusb/boot/{grub/mbusb.d/,isos}
 
 4. Copy the necessary GRUB files:
 
-        cd multibootusb && cp -rf grub.* $mntusb/boot/grub/
+        cd multibootusb && cp -rf mbusb.* $mntusb/boot/grub/
 
-5. Download [MEMDISK][] from [kernel.org][]:
+5. Copy the provided `grub.cfg`:
+
+        cp -f grub.cfg.example $mntusb/boot/grub/grub.cfg
+
+6. Download [MEMDISK][] from [kernel.org][]:
 
         wget -qO - 'https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz' | tar -xz -C $mntusb/boot/grub/ --no-same-owner --strip-components 3 'syslinux-6.03/bios/memdisk/memdisk'
-
-6. Download [Memtest86+][]:
-
-        wget -qO - 'http://www.memtest.org/download/5.01/memtest86+-5.01.bin.gz' | gunzip -c > $mntusb/boot/bin/memtest86+.bin
 
 
 ### Using the script
@@ -86,10 +85,11 @@ These are the options for the script:
 
 ```null
 Script to prepare multiboot USB drive
-Usage: makeUSB.sh [options] device [fs-type]
+Usage: makeUSB.sh [options] device [fs-type] [data-size]
 
  device                         Device to modify (e.g. /dev/sdb)
  fs-type                        Filesystem type for the data partition [ext3|ext4|vfat|ntfs]
+ data-size                      Data partition size (e.g. 5G)
   -b,  --hybrid                 Create a hybrid MBR
   -e,  --efi                    Enable EFI compatibility
   -i,  --interactive            Launch gdisk to create a hybrid MBR
@@ -98,46 +98,27 @@ Usage: makeUSB.sh [options] device [fs-type]
 ```
 
 
+## Adding to existing USB drive
+
+If you already have your own bootable USB drive that uses GRUB to boot, you can simply add the following lines into your custom `grub.cfg`:
+
+```
+# Load MBUSB configuration
+if [ -e "$prefix/mbusb.cfg" ]; then
+  source "$prefix/mbusb.cfg"
+fi
+```
+
+And then copy the project's configuration files to your drive's GRUB directory:
+
+```
+cd multibootusb && cp -rf mbusb.* $mntusb/boot/grub/
+```
+
+
 ## Get bootable files
 
-Once the USB drive is created, it only remains to copy the bootable files (ISO or kernel) to the pendrive. Currently, the following utilities are supported (save to `$mntusb/boot/isos`):
-
-{% if site.distros %}
-<svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
-  <symbol id="cfg-icon" viewBox="0 0 24 24">
-    <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-  </symbol>
-</svg>
-<svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
-  <symbol id="dl-icon" viewBox="0 0 24 24">
-    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-  </symbol>
-</svg>
-<svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
-  <symbol id="home-icon" viewBox="0 0 24 24">
-    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-  </symbol>
-</svg>
-<table class="distro-list">
-  <thead>
-  <tr><th colspan="2">Distribution</th></tr>
-  </thead>
-  <tbody>
-  {% for distro in site.distros %}
-  <tr>
-  <td markdown="1">
-  [{{ distro.title }}]({{ distro.url }})
-  </td>
-  <td markdown="1">
-  {% if distro.download %}<a href="{{ distro.download }}" alt="Download" title="Download"><svg class="icon"><use xlink:href="#dl-icon"/></svg></a>{% endif %}
-  {% if distro.homepage %}<a href="{{ distro.homepage }}" alt="Homepage" title="Homepage"><svg class="icon"><use xlink:href="#home-icon"/></svg></a>{% endif %}
-  {% if distro.cfgdir %}<a href="{{ site.github.repository_url | append: "/tree/master/grub.d/" | append: distro.cfgdir }}" alt="Configuration" title="Configuration"><svg class="icon"><use xlink:href="#cfg-icon"/></svg></a>{% endif %}
-  </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endif %}
+Once you have a bootable USB drive, it only remains to copy the bootable files (ISO or kernel) to the pendrive. See the [list of supported files][isos] for download links and then save them into `$mntusb/boot/isos`.
 
 
 ## Testing USB drive with QEMU
@@ -145,7 +126,7 @@ Once the USB drive is created, it only remains to copy the bootable files (ISO o
 To test the newly created USB drive in a virtual environment with [QEMU][], run:
 
 ```
-qemu-system-x86_64 -enable-kvm -localtime -m 2G -vga std -drive file=<device>,cache=none,format=raw,if=virtio
+qemu-system-x86_64 -enable-kvm -localtime -m 2G -vga std -drive file=<device>,readonly,cache=none,format=raw,if=virtio
 ```
 
 Where `<device>` is the name of the USB device (e.g. */dev/sdh*). Run `mount` to get this information.
@@ -165,6 +146,7 @@ Where `<device>` is the name of the USB device (e.g. */dev/sdh*). Run `mount` to
 - [Using Syslinux and memdisk][usingmemdisk]
 
 
+[isos]: isos.md
 [efi+bios]: https://wiki.archlinux.org/index.php/Multiboot_USB_drive#Hybrid_UEFI_GPT_.2B_BIOS_GPT.2FMBR_boot
 [grub-iso-boot]: https://github.com/Jimmy-Z/grub-iso-boot/blob/master/grub.cfg
 [hybridmbr]: http://www.rodsbooks.com/gdisk/hybrid.html
@@ -172,7 +154,6 @@ Where `<device>` is the name of the USB device (e.g. */dev/sdh*). Run `mount` to
 [kvmtuning]: http://www.linux-kvm.org/page/Tuning_KVM
 [loopback.cfg]: http://www.supergrubdisk.org/wiki/Loopback.cfg
 [memdisk]: http://www.syslinux.org/wiki/index.php?title=MEMDISK
-[memtest86+]: http://www.memtest.org/
 [multiboot-usb]: http://www.circuidipity.com/multi-boot-usb.html
 [multipass-usb]: https://github.com/Thermionix/multipass-usb
 [panticz-mbusb]: http://www.panticz.de/MultiBootUSB

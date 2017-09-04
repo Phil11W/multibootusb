@@ -11,6 +11,7 @@ This is a project that contains a collection of [GRUB][] files and scripts that 
 
 ## Documentation
 
+- [List of supported files][isos]
 - [Preparing the multiboot USB][install]
 - [Contributing to the project][contrib]
 - [Adding support for an ISO][howto]
@@ -21,14 +22,17 @@ This is a project that contains a collection of [GRUB][] files and scripts that 
 - [Easy2Boot][]
 - [GLIM][]
 - [grub-iso-boot][]
+- [grub-iso-multiboot][]
+- [GRUB2-filemanager][]
 - [MultiBootUSB][]
 - [MultiPass-USB][]
 - [SARDU][]
 - [SMI][]
+- [SystemImageKit][]
 - [YUMI][]
 
 
-[isos]: {{ "install.html" | relative_url }}#get-bootable-files
+[isos]: isos.md
 [install]: install.md
 [contrib]: contrib.md
 [howto]: howto.md
@@ -36,8 +40,11 @@ This is a project that contains a collection of [GRUB][] files and scripts that 
 [glim]: https://github.com/thias/glim
 [grub]: https://www.gnu.org/software/grub/
 [grub-iso-boot]: https://github.com/Jimmy-Z/grub-iso-boot
+[grub-iso-multiboot]: https://github.com/mpolitzer/grub-iso-multiboot
+[grub2-filemanager]: https://github.com/a1ive/grub2-filemanager
 [multibootusb]: http://multibootusb.org/
 [multipass-usb]: https://github.com/Thermionix/multipass-usb
 [sardu]: http://www.sarducd.it/
 [smi]: https://github.com/kilbith/smi
+[systemimagekit]: https://github.com/probonopd/SystemImageKit
 [yumi]: https://www.pendrivelinux.com/yumi-multiboot-usb-creator/

@@ -16,6 +16,7 @@ eficonfig=0
 interactive=0
 data_part=2
 data_fmt="vfat"
+data_size=""
 efi_mnt="/mnt/MBU-EFI/"
 data_mnt="/mnt/MBU-DATA/"
 log_file="/dev/null"
@@ -24,10 +25,11 @@ log_file="/dev/null"
 showUsage() {
 	cat <<- EOF
 	Script to prepare multiboot USB drive
-	Usage: $scriptname [options] device [fs-type]
+	Usage: $scriptname [options] device [fs-type] [data-size]
 
 	 device                         Device to modify (e.g. /dev/sdb)
 	 fs-type                        Filesystem type for the data partition [ext3|ext4|vfat|ntfs]
+	 data-size                      Data partition size (e.g. 5G)
 	  -b,  --hybrid                 Create a hybrid MBR
 	  -e,  --efi                    Enable EFI compatibility
 	  -i,  --interactive            Launch gdisk to create a hybrid MBR
@@ -106,8 +108,12 @@ while [ "$#" -gt 0 ]; do
 			fi
 			shift
 			;;
-		*)
+		[a-z]*)
 			data_fmt="$1"
+			shift
+			;;
+		[0-9]*)
+			data_size="$1"
 			shift
 			;;
 	esac
@@ -128,9 +134,8 @@ fi
 
 # Check for required binaries
 sgdisk_cmd=$(command -v sgdisk)         || cleanUp 3
-dd_cmd=$(command -v dd)                 || cleanUp 3
+wipefs_cmd=$(command -v wipefs)         || cleanUp 3
 wget_cmd=$(command -v wget)             || cleanUp 3
-gunzip_cmd=$(command -v gunzip)         || cleanUp 3
 tar_cmd=$(command -v tar)               || cleanUp 3
 command -v mkfs."${data_fmt}" >/dev/null  || cleanUp 3
 
@@ -182,6 +187,9 @@ if [ "$eficonfig" -eq 1 ]; then
 fi
 
 # Create data partition
+if [ ! -z "$data_size" ]; then
+	data_size="+$data_size"
+fi
 case "$data_fmt" in
 	ext2|ext3|ext4)
 		type_code="8300"
@@ -198,7 +206,7 @@ case "$data_fmt" in
 		;;
 esac
 tryCMD "Creating data partition on $usb_dev" \
-    "$sgdisk_cmd --new ${data_part}::: --typecode ${data_part}:\"$type_code\" \
+    "$sgdisk_cmd --new ${data_part}::${data_size}: --typecode ${data_part}:\"$type_code\" \
     --change-name ${data_part}:\"$part_name\" $usb_dev" || cleanUp 10
 
 # Unmount device
@@ -229,11 +237,13 @@ tryCMD "Setting bootable flag on ${usb_dev}${data_part}" \
 unmountUSB "$usb_dev"
 
 # Format BIOS boot partition
-tryCMD "Formatting BIOS boot partition on ${usb_dev}1" \
-    "$dd_cmd if=/dev/zero of=${usb_dev}1 bs=1M count=1" || cleanUp 10
+tryCMD "Wipe any file system signatures on ${usb_dev}1" \
+    "$wipefs_cmd -af ${usb_dev}1" || cleanup 10
 
 if [ "$eficonfig" -eq 1 ]; then
 	# Format EFI System partition
+	tryCMD "Wipe any file system signatures on ${usb_dev}2" \
+	    "$wipefs_cmd -af ${usb_dev}2" || cleanup 10
 	tryCMD "Formatting EFI System partition on ${usb_dev}2" \
 	    "mkfs.vfat -v -F 32 ${usb_dev}2" || cleanUp 10
 fi
@@ -245,6 +255,8 @@ if [ "$data_fmt" = "ntfs" ]; then
 else
 	mkfs_args="-t $data_fmt"
 fi
+tryCMD "Wipe any file system signatures on ${usb_dev}${data_part}" \
+    "$wipefs_cmd -af ${usb_dev}${data_part}" || cleanup 10
 tryCMD "Formatting data partition as $data_fmt on ${usb_dev}${data_part}" \
     "mkfs $mkfs_args ${usb_dev}${data_part}" || cleanUp 10
 
@@ -288,7 +300,7 @@ tryCMD "Installing fallback GRUB on ${usb_dev}${data_part}" \
 
 # Create necessary directories
 tryCMD "Creating directories on ${data_mnt}boot" \
-    "mkdir -p ${data_mnt}boot/bin ${data_mnt}boot/isos" || cleanUp 10
+    "mkdir -p ${data_mnt}boot/isos" || cleanUp 10
 
 # Detect GRUB directory name
 if [ -d "${data_mnt}boot/grub2" ]; then
@@ -300,8 +312,12 @@ else
 fi
 
 # Copy files
-tryCMD "Copying files to ${data_mnt}boot" \
-    "cp -rf ./grub.* $grub_dir" || cleanUp 10
+tryCMD "Copying files to ${grub_dir}" \
+    "cp -rf ./mbusb.* $grub_dir" || cleanUp 10
+
+# Copy example configuration for GRUB
+tryCMD "Copying grub.cfg to ${grub_dir}" \
+    "cp -f ./grub.cfg.example ${grub_dir}/grub.cfg" || cleanUp 10
 
 # Download memdisk
 tryCMD "Downloading memdisk to ${data_mnt}boot/grub" \
@@ -309,11 +325,6 @@ tryCMD "Downloading memdisk to ${data_mnt}boot/grub" \
     'https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03.tar.gz' \
     | $tar_cmd -xz -C $grub_dir --no-same-owner --strip-components 3 \
     'syslinux-6.03/bios/memdisk/memdisk'"
-
-# Download Memtest86+
-tryCMD "Downloading Memtest86+ to ${data_mnt}boot/bin" \
-    "$wget_cmd -qO - 'http://www.memtest.org/download/5.01/memtest86+-5.01.bin.gz' \
-    | $gunzip_cmd -c > ${data_mnt}boot/bin/memtest86+.bin"
 
 # Unmount data partition
 tryCMD "Unmounting data partition on $data_mnt" "umount -v $data_mnt" \
